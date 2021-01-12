@@ -8,7 +8,7 @@ I am sharing these here , so that it can useful later for myself as well as othe
 
 The following links were very useful in the preparation :
 
-- Mandatory courses for the Developer Path found in the  ( https://academy.datastax.com ) . Please ensure you answer all quizzes are done and fully understood from the DS101,DS210,DS220. 
+- Mandatory courses for the Developer Path found in the  ( https://academy.datastax.com ) . Please ensure you answer all quizzes and  fully understand the content of DS101,DS210,DS220. 
 
 - All the Labs from Katacoda - https://katacoda.com/datastax/courses/cassandra-intro/  - Would be very useful to understand all the core concepts fully. 
 
