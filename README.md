@@ -4,7 +4,7 @@ Cassandra Developer Certification  Datastax Preparation tips and guidance
 I took the 8 week Cassandra Developer Workshop programme offered by the kind folks of Datastax and as part of the learning of watching the videos 
 and doing the quizzes, exercises etc I had taken notes . 
 
-I am sharing these up here , so that it can useful later for myself as well as others. 
+I am sharing these here , so that it can useful later for myself as well as others. 
 
 The following links were very useful in the preparation :
 
