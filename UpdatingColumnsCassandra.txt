@@ -1,0 +1,17 @@
+
+
+When updating a table - the WHERE clause must contain all the columns of the primary key  ( ie the K and clustering columns) ,
+otherwise the UDPATE WILL RESULT IN AN ERROR.
+
+
+First, when inserting a new row into a table and the table already has a row with the same primary key, the existing row will effectively be updated. In other words, the insert operation will upsert data into the existing row. 
+
+Second, when updating a row that does not exist in a table, the row will be inserted into the table. In other words, the update operation will upsert the new row into the table. You can think about an upsert as an insert that causes an update or an update that causes an insert. 
+
+
+Finally, when deleting a row that does not exist in a table, a tombstone will simply be written.
+
+All primary key columns and their values must be specified in the WHERE clause to identify a row.
+
+A conditional UPDATE can also be used to prevent an upsert that may result from concurrent update.
+

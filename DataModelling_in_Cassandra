@@ -1,0 +1,70 @@
+
+DataModelling in C* 
+
+
+Chekboto - https://www.youtube.com/watch?v=UVeqscjInhI
+
+C* DataModel - Patrick - https://www.youtube.com/watch?v=4D39wJu5Too
+
+Oreily KataCoda - https://www.katacoda.com/datastax/courses/cassandra-data-modeling/messaging-data
+
+-- https://www.datastax.com/learn/data-modeling-by-example#coursework
+((this has all the examples datamodelling questions of the Certification exam.))
+
+
+- PK is how the data will be distributed (data distribution) - aka node locality.
+
+- PrimaryKEY defines data uniqueness
+
+- Partition Keys affects partition sizes
+
+- Clustering Key defines ordering with an PARTITION .. (not a TABLE) - Important 
+
+- COUNTER columns CANNOT be inserted and have a start value , they can only be incremented or decremented. start value is 0 as it is an INT.
+
+- STATIC columns - all the Rows in the same partition will share the SAME static Column Value. 
+
+- STATIC COLOUMS ONLY to be on NON CLUSTERING COLUMNS . Hence no static possible on partition key or clustering columns. 
+
+
+
+- when there is only ONE PartitionKey , 
+		- all the rows of the table will be in a SINGLE PARTITION . this is called single Row 
+ 		partition 
+
+- in composite partition key , there will be MULTI ROW Partitions , as the data will be distributed based on the combiniation of the columns of the partition key.
+
+- in where clause PARTITION key allows Equality Predicate . 
+
+- Clustering column is part of the where clause , we can use range ( > , <  etc) , (ie inequality predicate).
+
+-  WHERE clause NOT Allowed  on STATIC Columns 
+
+Key Modelling steps 
+	 - conceptual data model - understand the data
+	 		- this models the entities, the Relationships (1:n, 1:1 etc), possibly field types for a attribute being a UDT / Collection etc. 
+
+	 - application workflow - identify access patterns
+	 	- shows the flow of the application from a user point of view. 
+	 		- show all the Networks 
+	 			- next choose one network from the above and show all the sensors order by sensorname
+	 				- choose 1 Sensor from the list 
+	 					- display details of that sensor (latitude/longtitude/ heat etc )
+
+	 - logical data model - query first approach 
+	 		- this is the actual ERD diagram which shows the tables in C* as identified by the application workflow.
+
+	 - physical data model - optimize and implement. 
+
+
+
+
+
+
+
+
+
+
+
+
+- create index , create custom index 

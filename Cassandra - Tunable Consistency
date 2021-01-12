@@ -1,0 +1,91 @@
+Cassandra - Tunable Consistency 
+
+
+CAP - 
+	- C* is a AP database nd it has Tuneable Consistency 
+	- It is Partition Tolerant Always 
+		and it trades off between Consitency and Availabilty 
+		as and when the need arises. 
+
+Tuneable Consistency  TC 
+- Defn of Consistency :  ensuring data from any node is the same in the other nodes as well for that SAME paritiion key - 
+
+
+TC can be configured separately for READ and WRITE 
+
+	Write Consistency 
+		- The 	No of replicas on wich write MUST succeed before returning success to client.
+		- The Replica Nodes COULD also live in another cluster.
+		- LEVELS ARE 
+				- ONE  - only one replica needs to be updated
+				
+				- ALL  - all replicas need to be updated
+				
+				- QUORUM - MORE THAN HALF ( of the Replicas ) that should be updated before we say success. So if RF is 3, and CL is Quorum then ::  3/2 = 1.5 so 2 NODES  should be updated before we return success . 
+				
+				- LOCAL_QUORUM - Minimum number of replicas that need to be updated PER DATACENTRE for the write operation to return a success. 
+				-
+			
+		- Coordinator Node determines the replica nodes with the use of token and ReplicaPlacementStrategy.		
+		- Token gives the primary replicaa node 
+		- ReplicaPlacementStrategy - gives the info about the remaining replica nodes. 
+		- Coordinator node sends the DATA  to all the REPLICA nodes simultaneously - 
+		but as soon as the CL returns ( quorum etc ) , it will say the READ/WRITE has been performed.  CL is used here to return to the client saying the `operation` is good. 
+
+
+
+Strong Consistency is got when the Consistency Level is set in C* as Follows 
+
+		W +  R > RF == Strong consistency	
+
+			- WRITE  with CL of Quorum &&  READ with CL of ALL 	
+
+			*** Mne [wq,ra]
+
+			- Write  ALL , READ One 
+
+Since C* is a AP oriented database , we can tune the consistency level to get it close to ACID ... 
+
+When a Node is down and not able process a request , in this case the coordinator node keeps the data  in the HINT  file and will then send it to the failed node after it recovers and is alive... and will send it once the Node Comes back up . This is called HINTED HAND OFF . If the node does nt come up within 3 hours, then  we purge the hint file. 
+
+Important -Hint Default storage time is 	(default 3 hours) , 
+
+	
+READ consistency : 	
+	
+		- number of replicas to check before returning data to the client 
+				- ONE 
+
+				- ALL 
+
+				- QUORUM 
+
+				- LOCAL QUORUM 	
+
+		SNITCH - Is a programme in C* that keeps track of DC and Racks information  . It has all the metadata about the CLUSTER. Also 
+		monitors network latency and maintains data for each replica. Hence 		
+
+
+
+
+INDEX :  Index with MULTIPLE COLUMNS ARE NOT ALLOWED IN C* . Default in C* is secondary indexes (aka 2i)
+
+create table .restaurants_by_city(
+		name text , 
+		city text,
+		cusine text,
+		price int, 
+		primary key ((city),name)
+	
+)
+
+// Example Query 
+select from restaurants_by_city where city = 'Sydney' and cusine ='Sushi'
+
+On its own this query will fail as there is no 'cuisine' column in the partition key of the restaurants_by_city table . 
+
+However if we create a secondary index , this QUERY  WILL WORK 
+
+CREATE INDEX cusine_restaurants_by_city_2i ON restaurants_by_city(cusine)
+
+SASI index needs to have the OPTIONS keyword , used when we can use text based searches using 'LIKE' keyword etc. 

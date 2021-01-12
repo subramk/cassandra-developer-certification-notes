@@ -1,0 +1,103 @@
+Partition Keys and Clustering Columns
+
+
+Week - 2 Course : 
+
+A primary key uniquely identifies a row.
+A composite key is a key formed from multiple columns.
+A partition key is the primary lookup to find a set of rows, i.e. a partition.
+A CLUSTERING column  is the part of the primary key that isn't the partition key (and defines the ordering within a partition).
+(NOTE : CLUSTERING COLUMN DEFINES ORDERING WITHIN A PARTITION ( and not within a table - this is seen on the exam, so pls be clear
+about this))
+
+Examples: 
+
+PRIMARY KEY (a): The partition key is a.
+PRIMARY KEY (a, b): The partition key is a, the clustering key is b.
+PRIMARY KEY ((a, b)): The composite partition key is (a, b).
+PRIMARY KEY (a, b, c): The partition key is a, the composite clustering key is (b, c).
+PRIMARY KEY ((a, b), c): The composite partition key is (a, b), the clustering key is c.
+PRIMARY KEY ((a, b), c, d): The composite partition key is (a, b), the composite clustering key is (c, d).
+
+BRACKETING ONLY FOR PARTITION KEY , NO BRACKETING for Clustering Columns. 
+
+Partition : A Row / Rows of data that are stored on a particular node based on the selected partitioning strategy.
+
+Partition Key : defines the node in which the data is stored.
+
+Note : If we don t use the partition key in the 'WHERE clause' it will cause a full cluster
+scan which is really a very ineffective way to find data. 
+
+HENCE ONE OF THE MAIN REASONS WHY WE HAVE A TABLE FOR EVERY QUERY IN C* - AS THE MOST EFFECTIVE WAY TO QUERY THE TABLE IS VIA THE PARTITION KEY . 
+
+Ex :
+create table product 
+	productId varchar, 
+	title text , 
+	publisher text , .....
+	PRIMARY KEY (productId) ; // note no clustering columns 
+
+select productId from product where publisher='Riverhead'
+
+// above query fails as the PARTITION key is NOT Part of the where Clause .. 
+
+When Primary key has both K and C , then all the columns of the K must be part of the where clause . If Clustering columns is used, then it should be constrained from Left to Right. 
+
+
+In the above example, the C* nodes store data based on the productId which happens to be 
+the partition Key as well . Why - because the partition key is the first column Of a primary key . ( more explicity the hashed token values of the partitionKey)
+
+Having a where clause on 'publisher' column causes a full scan of All the nodes in the Ring and this is inefficient . The Read may fail , if one of the nodes being queried return an error .  There is  also  a chance that The Read may time out as well. 
+
+The Only way is to use 'Allow Filtering' which may make the query work . 
+
+All the Columns of the Partition Key should be restricted in the query 
+We cannot use RANGE queires ie ( >, >=, <,<= operators directly on the partition key ) 
+
+IMPORTANT : Only `IN` and `=` operators are allowed on the Partition Key , when used as part of the WHERE Clause.  
+
+We CAN USE >, >=, <,<= operator on the token 
+
+select * from skus where token(sellerId, skuId) >= token('Chroma', 'pasteSkuId')
+
+Clustering Column : Defines the order in which the rows are stored WITHIN a partition . 
+
+Very important : In C* we HAVE to use the partition key as part of the WHERE clause as 
+this is the most efficient way to retrieve data. If we have a complex primary key (say having 2 columns then the query will also need to have both of these columns AND IN THE SAME ORDER . 
+
+If we have AMY Clustering columns as part of the `where` clause, they must be constrained left to right . 
+
+
+Primary key includes the partition key and any/all clustering columns. They can be the same but are usually Are'nt .
+
+Ex 
+CREATE TABLE catalog.skus (
+sellerid text,
+skuid text,
+timeofskucreation text,
+productid text,
+islistingcreated boolean,
+listingid text,
+title text,
+PRIMARY KEY ((sellerid, skuid), timeofskucreation, productid)
+) WITH CLUSTERING ORDER BY (timeofskucreation ASC, productid ASC)
+
+// This works as both the columns of the partition key are present in the where clause.
+select * from skus where sellerid = 'Fab' and skuid = 'FABSKU'; 
+
+When querying  we NEED  to USE  the same order of the clustering column used when creating the table . Querying order should be same as the order as the clustering column order . Also note that in the WHERE Clause , We NEED to have the PARTITION key  - why ? - This is what gives us Node Locality - the ability of the C* Engine to retrieve the data quickly /efficiently . 
+
+ALSO the order of the clustering columns defined at the time of table creation , SHOULD  be the order used when retreiving the rows as this gives us Max Efficiency to pull out the rows . C* DOES NOT ALLOW `OUT OF ORDERING RESTRICTIONS`  ON CLUSTERING COLUMNDS - The word RESTRICTIONS here means 'where' clause.
+
+CLUSTERING COLUMNS can ONLY be CONSTRAINED FROM Left to Right in the order they appear in the primary key.
+
+In the above table, a WHERE clause should have the primary key in it BUT the Clustering column can be constrained from Left to Right .  
+
+It is NOT REQUIRED  for all the Clustering columns to be present in the where cause  - but if they are present they should be present from LEFT to RIGHT . 
+
+Ex: select * from skus where sellerid = 'Fab' and skuid = 'FABSKU' and timeofskucreation='2020-12-12'  - OK 
+
+Ex: select * from skus where sellerid = 'Fab' and skuid = 'FABSKU' and productid='1011'  -  NOT OK ,  as THE ORDER of  the Clustering Columns  is not maintained here . ( order of Clustering keys is constrained from Left to Right.....)
+
+
+INDEX :  Index with MULTIPLE COLUMNS ARE NOT ALLOWED IN C* 

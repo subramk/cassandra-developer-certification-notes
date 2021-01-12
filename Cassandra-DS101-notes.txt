@@ -1,0 +1,73 @@
+C* DS-101 notes
+===============
+
+- In C* , we use more of Full Cluster Scan to do a CRUD read rather than a full table scan as done in RDBMS 
+- C* , is a HA , Fast distributed database , witih linear Scalability 
+- it uses peer to peer and not master slave 
+- it is multi DC by default , 
+- it is not a Replacement for RDBMS 
+- rdbms is used to store smaller amounts of data , while C* is for large datasets
+
+
+- C * Ring 
+	- no master slave , no config server or zookeepers 
+	- data partitioned around a ring 
+	- data replication to RF = N servers
+	- all nodes in the ring can answer both read and write queries
+	- location of data on the ring is deterermined by the partition key . ( more precisely the hashed value of the Partition key determines the node in the ring where the data actually gets written to.. ( murmur algorithym.)) 
+	- Hashvalue - (computed using the murmur alogorityhmm)
+	- CAP Theroem - Consistency , Availability , Partition Tolerance 
+	- C* is a AP database , ie , High availablity and Partition Tolerance.
+	- C* chooses Avaialbility & Partition Tolerance over Consistency . 
+	- Since Clusters can be spread across regional zones - it is near impossible to have the same data replicate amongst say US and Asia Zones . We are limited here sheer geographical distance and hence 
+	data consistency can be comporised to get High Availabity and Partition Tolerance . 
+
+Replication Factor ( Note : Set at Keyspace level )
+	- data gets replicated automatically , RF is used to determine how many servers this is written to 
+	- Replication happens asynchronously 
+	- If machine is down during replication  , missing data is REPLAYED to the failed NODE when it is back up again . This is called hinted Hinted HandOff  in C* .
+	
+	- Consistency Level - ( Set at Query or Write level)
+		Important - Set on Every Read or Write Request - ie PER OPERATION 
+		- Consistency level : ALL , QUORUM , ONE 
+		- This means, how many replicas do I need to hear from before C* can acknowledge to the calling client that all is Good. 
+
+	- Lower the consistency level , faster the response time - and vice versa. 
+	- Also lower consistency level will been higher availability as no need for C* to contact more than one node across a different cluster to ensure consistency. If for example the other node is down , then our consistency is affected and it will take longer to acknowledge back to the caller. 
+	- So if we have a RF of 3 and Consistency of ONE, we can still be able to perform read and writes even if 2 nodes are down temporarily.
+
+	Multi DC 
+	- Typically , clients write to local DC which replicates async to other DC's
+	- RF is per keyspace per datacentre 
+	- Datacentre can be physical or logical 
+
+	Replication Strategy : This is given at the time of keyspace creation 
+	SimpleStrategy - used when there is only ONE DC
+	NetworkTopologyStrategy - used where are multiple DC's. (ie multiple rings)
+
+
+Write Path : COMMITLOG(hdd) -> MEMTABLE(hdd) - SSTABLE(hdd) 
+
+	- writes are written to any node in the cluster - (called a coordinator node)
+	- writes are written to A commit log (ON HDD), then to a mem table (ON RAM)
+	- commit log entries are just sequential appending 
+	- memTable entries are sorted by the clustering column.
+	- every write includes a timestamp
+	- MEMTABLE  are in RAM and when they are full they are  flushed periodically to disk - ie to the SSTable
+	- deletes are a special write case called a "tombstone"
+
+SSTABLE 
+	- immutable data file for row storage
+	- every write includes a timestamp of WHEN  it was written
+	- partition is spread across multiple SSTables
+	- Same column can be in multiple SSTables
+	- Compaction - takes several small SSTables and merges them into big ones. 
+	- Because of Compaction , Only latest timestamp is kept 
+	- deletes are written as 'tombstones'
+	- Easy backups. Copying the SSTable into another server basically gives us a 'data backup ' OOTB. 
+
+READ Path 
+	- Any server may be queried and it acts as co-ordinator
+	- contacts nodes with the requested key 
+	- on each node,data is pulled from SSTables and merged 
+	- Consistency < ALL performs read repair in background (read_repair_chance configuration)

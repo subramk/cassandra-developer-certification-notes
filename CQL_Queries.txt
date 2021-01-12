@@ -1,0 +1,406 @@
+
+I used a docker image for my practice of cql queries .  Once docker is installed 
+in your machine , you can use cqlsh to run 
+
+
+docker rm my-cassandra
+
+docker pull cassandra
+
+docker stop my-cassandra
+
+docker run --name my-cassandra cassandra -p 9042:9042
+
+// cqlsh can be brought up as such 
+
+docker exec -it my-cassandra cqlsh
+
+
+-- keyspace creation for practice 
+
+CREATE KEYSPACE demo WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+CREATE KEYSPACE killrvideo WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+
+use demo;
+
+I have used arbitary question numbers with a view to what is being tested. you may run them in your 
+machine and 
+
+
+Q.9
+
+create type ADDRESS_9 (
+	street TEXT , city TEXT , state TEXT , postal_code TEXT 
+
+); 
+
+
+create table USERS_9( 
+	id UUID, 
+	address ,
+	PRIMARY KEY(id)
+
+);
+
+insert into USERS_9 (id,address) values (6bea4d1a-4c63-11eb-ae93-0242ac130002
+	{
+		street:'11 jeffs road',
+		city:'Austin',
+		postal_code:'TX222'
+	}
+
+)
+
+IF we have to update only the state part othe address column , then the statment syntax would be of the type
+
+update USERS_9 set address.state='TX' where id=6bea4d1a-4c63-11eb-ae93-0242ac130002;
+
+Note:  address.state is the way we refer to a property of a UDT.
+
+Q.53
+
+create table tempreatures_by_sensor_53 (
+	sensor TEXT, 
+	date TEXT ,
+	timestamp timestamp,
+	value FLOAT,
+	PRIMARY KEY ( (sensor,date),timestamp)
+) WITH CLUSTERING ORDER BY (timestamp desc);
+
+
+insert into tempreatures_by_sensor_53(sensor,date,timestamp,value) values ('s1001', '2020-11-11',toTimestamp(now()),1.0);
+insert into tempreatures_by_sensor_53(sensor,date,timestamp,value) values ('s1002', '2020-11-12',toTimestamp(now()),2.0);
+insert into tempreatures_by_sensor_53(sensor,date,timestamp,value) values ('s1001', '2020-07-06',toTimestamp(now()),3.0);
+insert into tempreatures_by_sensor_53(sensor,date,timestamp,value) values ('s1004', '2020-11-11','2020-07-06 12:59:44',4.0);
+
+delete value from tempreatures_by_sensor_53 where sensor='s1004'and date='2020-11-11' and timestamp='2020-07-06 12:59:44';
+
+-- AFTER THE ABOVE, WE ARE STILL LEFT WITH 4 ROWS IN THE TABLE , ( DELETE IS ON COLUMN , NOT ON ROW ... NOTE THE TRICK HERE !!) . Notice the catch in 'DELETE value'
+
+
+
+Q.10
+
+create table numbers_10(id TEXT , s SET<INT>, l LIST<INT>, m MAP<TEXT,INT>, PRIMARY KEY ((id)) );
+
+
+INSERT INTO numbers_10(id,s,l,m) values('x',{1,2,3},[1,2,3],{'a':1, 'b':2,'c':3});
+
+update numbers_10 SET 
+	s = s + {2,3,4},
+	l = l + [2,3,4],
+	m = m + {'b':2,'c':3,'d':4}
+where id ='x'; 
+
+What is output of select * from numbers_10  ;  // question tests understanding of list,set,map semantics in 
+Cassandra . ( It is the same as Java version of List,Set and Map)
+
+So 
+SET - no duplicates, 
+List - Ordered insertion
+Map - no duplicate keys. 
+
+
+Q.11 
+
+create table users_11( 
+	email TEXT,
+	name TEXT, 
+	age INT,
+	date_joined DATE,
+	PRIMARY KEY ((email))
+);
+
+update users_11 
+	set name ='Joe', date_joined='2020-11-11' 
+	where email ='joe@datastax.com';
+
+insert into users_11(email,age) values('joe@datastax.com',25);
+
+UPDATE comes before INSERT , but C* does an UPSERT . An UPSERT in C* does a INSERT before UPDATE or an 
+UPDATE followed by an INSERT
+
+
+
+  
+
+
+
+Q.14
+
+create table tempreatures_by_sensor_14 (
+	sensor TEXT, 
+	date TEXT ,
+	timestamp timestamp,
+	value FLOAT,
+	PRIMARY KEY ( (sensor,date),timestamp)
+) WITH CLUSTERING ORDER BY (timestamp desc);
+
+
+insert into tempreatures_by_sensor_14(sensor,date,timestamp) values ('100', '2020-11-11',toTimestamp(now()));
+insert into tempreatures_by_sensor_14(sensor,date,timestamp) values ('200', '2020-11-12',toTimestamp(now()));
+insert into tempreatures_by_sensor_14(sensor,date,timestamp) values ('300', '2020-11-13',toTimestamp(now()));
+
+Can we insert toTimestamp(now())) value into a timestamp column. ?  - Please also check what a UUID datatype
+column can handle . It cannot take a timestamp as a value, can it take a timeuuid() as an input. 
+
+
+Q.18 
+
+create table folders_by_user_18 (
+	username TEXT, 
+	label TEXT , 
+	color TEXT , 
+	PRIMARY KEY((username),label)
+);
+
+insert into folders_by_user_18(username,label) values ('Kash','in'); 
+insert into folders_by_user_18(username,label) values ('raj','inn'); 
+insert into folders_by_user_18(username,label) values ('premier','sin'); 
+insert into folders_by_user_18(username,label) values ('Kash','outbox'); 
+insert into folders_by_user_18(username,label) values ('Kash','personal'); 
+
+select * from folders_by_user_18 where username ='kasi' and label >='in';
+
+-- This tests if Range queries is allowed for Clustering Key. The Answer is that Clustering keys can have
+range queries , but Partition keys can only be queried using '=' and 'IN'. 
+
+
+
+
+
+
+create table users3(
+	email TEXT , 
+	name TEXT,
+	age INT,
+	date_joined DATE,
+	PRIMARY KEY((email)));
+
+
+update users3 SET NAME='Joe1', age=11,date_joined = '2020-01-01' where email ='joe@datastax.com'; 
+update users3 SET NAME='Joe2', age=12,date_joined = '2020-01-01' where email ='joe@datastax.com'; 
+update users3 SET NAME='Joe3', age=13,date_joined = '2020-01-01' where email ='joe@datastax.com'; 
+update users3 SET NAME='Joe4', age=14,date_joined = '2020-01-01' where email ='joe@datastax.com'; 
+
+insert into users3(email,age) values ('joe@datastax.com',25); 
+
+select * from users where email='joe@datastax.com';
+
+
+
+
+
+Q.58 
+
+create table USERS_58( 
+	id UUID, 
+	name text ,
+	PRIMARY KEY(id)
+
+);
+
+insert into USERS_58(id,name) values ( uuid(), 'Joe');
+insert into USERS_58(id,name) values ( uuid(), 'Joe');
+insert into USERS_58(id,name) values ( now(), 'Joe');
+
+insert into USERS_58(id,name) values ( totimestamp(now()), 'Joe');
+
+
+
+
+
+
+Q 12 : 
+
+WILL THIS BATCH PASS OR FAIL . 
+
+create table shopping_cart (
+	cart_id UUID,
+	item_id UUID,
+	price DECIMAL,
+	total DECIMAL static,
+	PRIMARY KEY((cart_id),item_id)
+);
+
+
+insert into shopping_cart(cart_id, item_id,price, total) values (6bea4b3a-4c63-11eb-ae93-0242ac130002, 6bea4f7c-4c63-11eb-ae93-0242ac130002,0.01, 0.01);
+
+BEGIN BATCH 
+	insert into shopping_cart(cart_id, item_id,price, total) values (6bea4b3a-4c63-11eb-ae93-0242ac130002, 6bea4856-4c63-11eb-ae93-0242ac130002, 12.50, 125);
+
+	insert into shopping_cart(cart_id, item_id,price, total) values (6bea4b3a-4c63-11eb-ae93-0242ac130002, 6fea535a-4c63-11eb-ae93-0242ac130002, 14.50, 200);
+
+	insert into shopping_cart(cart_id,total) values (6bea4b3a-4c63-11eb-ae93-0242ac130002,300) IF NOT EXISTS;
+
+APPLY BATCH 
+
+
+
+create table shopping_cart_39 (
+	cart_id UUID,
+	item_id UUID,
+	price DECIMAL,
+	total DECIMAL static,
+	PRIMARY KEY((cart_id),item_id)
+);
+
+
+insert into shopping_cart_39(cart_id, item_id,price, total) values (6bea4b3a-4c63-11eb-ae93-0242ac130002, 6bea4f7c-4c63-11eb-ae93-0242ac130002,0.01, 0.01);
+
+BEGIN BATCH 
+	insert into shopping_cart_39(cart_id, item_id,price, total) values (6bea4b3a-4c63-11eb-ae93-0242ac130002, 7fea4856-4c63-11eb-ae93-0242ac130002, 12.50, 125);
+
+	insert into shopping_cart_39(cart_id,total) values (6bea4b3a-4c63-11eb-ae93-0242ac130002,300) IF NOT EXISTS;
+
+APPLY BATCH; 
+
+
+
+create table shopping_cart_20 (
+	cart_id UUID,
+	item_id UUID,
+	price DECIMAL,
+	total DECIMAL static,
+	PRIMARY KEY((cart_id),item_id)
+);
+
+
+insert into shopping_cart_20(cart_id, item_id,price, total) values (6fea450e-4c63-11eb-ae93-0242ac130002, 9cea450e-4c63-11eb-ae93-0242ac130002,0.01,0.01);
+
+BEGIN BATCH 
+insert into shopping_cart_20(cart_id,item_id,price) values (6fea450e-4c63-11eb-ae93-0242ac130002, 7fea450e-4c63-11eb-ae93-0242ac130002, 1.0);
+
+insert into shopping_cart_20(cart_id,item_id,price) values (6fea450e-4c63-11eb-ae93-0242ac130002, 9bea450e-4c63-11eb-ae93-0242ac130002, 2.0);
+
+update shopping_cart_20 set total=3.01 where cart_id=6fea450e-4c63-11eb-ae93-0242ac130002 IF total=0.01; 
+
+APPLY BATCH 
+
+// Above BATCH will pass as the IF check is APPLIED , if it had FAILED , entire BATCH will NOT BE APPLEID. 
+
+
+Q 29 . 
+
+create table product_rating_stats_29 (
+	id UUID,
+	num_ratings COUNTER, 
+	sum_ratings COUNTER, 
+	PRIMARY KEY((id))
+);
+
+// insert statments are not allowed on counter tables. Counter colums Can be ONLY udpated . 
+INSERT INTO product_rating_stats_29(id,num_ratings,sum_ratings) values(6fea450e-4c63-11eb-ae93-0242ac130002, 10 , 100); 
+
+UPDATE product_rating_stats_29 SET num_ratings= num_ratings + 1 , sum_ratings=sum_ratings + 7
+where id=6fea450e-4c63-11eb-ae93-0242ac130002;
+
+UPDATE product_rating_stats_29 SET num_ratings -= 1 , sum_ratings -= 7
+where id=9fea450e-4c63-11eb-ae93-0242ac130002;
+
+
+Q.32 
+
+create table users_32(
+	email TEXT , 
+	name TEXT,
+	age INT,
+	date_joined DATE,
+	PRIMARY KEY((email,name,age)));
+
+
+insert into users_32(email,name,age,date_joined) values('kasi@kas.com','kasi',22,'2020-1-1'); 
+insert into users_32(email,name,age,date_joined) values('john@kas.com','john',23,'2020-1-1'); 
+
+
+
+
+
+q.36 
+
+create table folders_by_user_36 (
+	username TEXT, 
+	label TEXT , 
+	color TEXT , 
+	PRIMARY KEY((username),label)
+);
+
+( Catch : When updating a ROW , we need to specify all columns of the Primary Key ,ie the K and the Clustering columns if any should be part of the where Clause.)
+
+insert into folders_by_user_36(username,label,color) values ('joe@datastax.com','inbox','green');
+update folders_by_user_36 set color='orange' where username='joe@datastax.com' AND label='inbox';
+update folders_by_user_36 set color='purple';
+update folders_by_user_36 set color='red' where username='joe@datastax.com';
+
+
+Q.50 
+
+
+create table orders_by_user_50(
+	username  TEXT , 
+	orderid UUId, 
+	status TEXT,
+	PRIMARY KEY((username),orderid));
+
+
+insert into orders_by_user_50(username,orderid,status) values ('joe',6bea450e-4c63-11eb-ae93-0242ac130002,'received');
+
+insert into orders_by_user_50(username,orderid,status) values ('joe',6bea450e-4c63-11eb-ae93-0242ac130002,'processing')
+	IF NOT EXISTS; 
+	// this row will not get APPLIED  as primary key is violated. 
+
+// .. consequently this row will NOT get APPLIED.
+update orders_by_user_50 set status='prepare to ship' where username='joe' AND orderid=6bea450e-4c63-11eb-ae93-0242ac130002 IF status='processing';
+
+// .. consequently this row will NOT get APPLIED.
+update orders_by_user_50 set status='canceleld' where username='joe' AND orderid=6bea450e-4c63-11eb-ae93-0242ac130002 IF status IN('processing','prepare to ship');
+
+
+Q 53 : How may rows in the folders_by_user_53 after the the following operations.
+
+create table folders_by_user_53 (
+	username TEXT, 
+	label TEXT , 
+	color TEXT , 
+	PRIMARY KEY((username),label)
+);
+
+
+insert into folders_by_user_53(username,label,color) values ('joe@datastax.com','inbox','blue');
+
+insert into folders_by_user_53(username,label,color) values ('joe@datastax.com','spam','white');
+insert into folders_by_user_53(username,label,color) values ('joe@datastax.com','sent','red');
+
+delete from folders_by_user_53 where username='joe@datastax.com';
+
+
+Q60) 
+
+Is this a single partition batch or multi partition batch .
+
+
+create table users_60(
+	email TEXT , 
+	name TEXT,
+	PRIMARY KEY((email)));
+
+create table users_by_name_60(
+	email TEXT , 
+	name TEXT,
+	PRIMARY KEY((name),email));
+
+
+BEGIN BATCH 
+insert into users_60(email,name) values ('joe@joe.com', 'joe'); 
+
+insert into users_by_name_60(email,name) values ('joe@joe.com', 'joe'); 
+
+
+APPLY BATCH; 
+
+
+Answer : This is a multi partition batch which can be applied. 
+
+
+
+

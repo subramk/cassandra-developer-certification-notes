@@ -1,0 +1,28 @@
+
+Secondary indexes
+
+- Secondary indexs are stored on each node in a cluster ... so a query involving a index could 
+easily becoming a performance bottleneck . 
+
+- Always try to index a column with low cardinality of few values. 
+
+- COUNTER column cannot be used in creating index.
+
+- CLUSTERING column CAN be used in creating a index. 
+
+- Indexes may be created aon MULTIPLE Columns but should have ONE  create index statement for each column . ( important )
+
+- SASI index must have the OPTIONS Keyword on it . 
+
+
+https://docs.datastax.com/en/cql-oss/3.3/cql/cql_using/useSecondaryIndex.html
+
+https://docs.datastax.com/en/cql-oss/3.3/cql/cql_using/useInsertSimple.html
+
+
+
+
+
+
+
+

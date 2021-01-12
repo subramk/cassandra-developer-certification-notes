@@ -1,0 +1,142 @@
+C* DS-201 Course notes.txt 
+
+PARTITIONS 
+
+
+
+
+- VERY IMPORTANT 
+	- PARTITION KEY DETEREMINS HOW THE DATA GETS PUT ONTO THE RING 
+	- first value in the Primary key is ALWAYS the Partition Key 
+	- primary key has to be unique enough so we usally have a partition key along with other columsum/s to make it a primary key ( to ensure uniqueness)
+
+Partition Key 
+	- mandatory when defining table , 
+	- usually given in brackets - and Partition Key is part of the primary key 
+	- primary key gives uniqueness to the row of data . PartKey determines which node that 
+	the data will get saved in . this is very important when we do a get.
+	- primary key will generally be a UUID or some form of a composite key that will help to determine the uniqueness of the row of data. 
+
+
+Clustering Columns 
+	- columns that determine the sorting order 
+	- mentioend at the time of table creation 
+
+
+
+A table with single-row partitions is a table where there is exactly one row per partition. A table with single-row partitions defines a primary key to be EQUIVALENT  to a partition key.
+
+A table with multi-row partitions is a table where there can be one or more rows per partition. A table with multi-row partitions defines a primary key to be a combination of both partition and clustering keys. Rows in the same partition have the same partition key values and are ordered based on their clustering key values using the default ascendant order.
+
+
+If we have only a COMPOSITE Primary KEY with no specific mention of the PK, THEN the first column OF THE COMPOSITE Primary KEY is the Partition Key (K) and the rest of the composite columns become the Clustering columns. 
+
+
+Ring 
+Snitch	- metadata about which Rackspace and DC etc - tBD 
+
+
+Consistency 
+	- C* is a database that leans towards AP - Availabliity , Partition Tolerance . ie it is optimised for AP 
+	
+	- It has got tunable Consistency 
+	- What this means is that as a developer  we can specifiy what Consistency levels we need when we read and write to C* ( this we specify via the Consistency Level )
+	
+	- CL are - ONE,QUORUM,ALL 
+	
+	- CL refers to the Acknowledgement that needs to happen before we communicate to the client that the job is done. 
+
+	- Strong Consistency  Option 1 : When Write CL is at 'ALL ' , ensuring all nodes have the data and then we have a READL CL of 'ONE' , AS we can be guranteed that the data is not stale at the time of the Read. 
+
+	- Strong Consitency Option 2 : When Write and Read CL are  both at  'Quorum' , this is more quick that the above ensuring we have quicker response times. 
+
+	- Write CL = 'One' and Read at 'ONE' is fastest and will ensure 'Eventual' Consistency. 
+
+	- CL of 'Any' should not be used - this means that just storing of a hint suffices
+	and no need to ensure that one or more replicas actually have the data. Obviously ANY should not be used as a HINT by itself does not suffice. 
+
+	- Very Important : RF means how many copies of data will be stored in C* . 
+	- CL on the other hand is to do with what will be the number of nodes that will need to be updated before returning success to the CLIENT . 
+
+	
+Hinted Hand off 
+	- How to ensure Write Requests are completed even when nodes are down . 
+	- C* does this via Hinted Handoff . 
+	- Coordinator node stores the data that needs to be written to the 'non live' node 
+	once it comes back up online
+	- hints are stored in the directory  that is specified in the cassandra.yaml . 
+	- Default is 3 hours of wait , but can be configured.
+	- Consitency ANY means just Hint will suffice. 
+
+READ Repair :
+	
+	- Nodes can get out of sync for various reasons. 
+	- C* follows AP by default on the  CAP Theorem
+	- Coordinator node has to ensure that the data is written to all the nodes (CL = ALL)
+	- sometimes data does not match amongst the nodes . 
+	- in these situations, the coordinator must ensure that all replicas are in sync with the latest data based on the timestamp 
+	- READ Repair chance is DEFINTETELY peformend when READ CL is less than ALL
+	- READ Repair done in background aysnchronously 
+	- READ Repair is confined ot the same DC as the cooridinator node . It is set to 0.1 by default (dclocal_read_repair_chance)
+	- read_repair_chance set to 0 by default 
+		:: for read repair across all datacentres with replicas. 
+
+Node Sync : 
+
+Write Path 
+==========
+
+Note : Mnemonic
+				COMMIT LOG (HDD)- sequential 
+					MEMTABLE (RAM)- stored based on ordering by the clustering column 
+						SSTABLE (HDD) - will have ordering on it as the source is memtable.
+
+When C* writes data , it does it to two places. 
+
+1) MemTable (on the RAM )
+	- stored based on SORTED as specfified by the clustering Column. 
+
+2) Commit Log ( on the HDD ) - storage here based on only  appending - 
+ie data is stored sequentially. (no ordering here , only sequential)
+
+When MemTable is full , it flushes to a separate table [on the HDD] and this is called SSTable. 
+
+So SSTable also will have the ordering in it , as the source of it is the MemTable. 
+
+C* does Client Acknowlegement happens after data is written to BOTH MemTable and Commit Log 
+
+
+
+===========
+Counter type : COUNTER COLUMNS : WHEN COUNTER COLUMN is used in a table all the other columns should be only partition key or clustering column. 
+
+Counter value CANNOT BE SET . it can only be incremented/decremented. 
+	
+===========
+
+
+A Counter column value is a 64-bit signed integer. You cannot set the value of a counter, which supports two operations: increment and decrement.
+
+Use counter types as described in the "Using a counter" section. Do not assign this type to a column that serves as the primary key or partition key. Also, do not use the counter type in a table that contains anything other than counter types and the primary key. 
+
+To generate sequential numbers for surrogate keys, use the timeuuid type instead of the counter type. You cannot create an index on a counter column or set data in a counter column to expire using the Time-To-Live (TTL) property.
+
+
+Read Path :
+===========
+- When data is written it is written to Commit-log and Memtable . Memtables flushes to SSTables ( which is on HDD ) when the  RAM is full .
+
+- On Read , C* needs to read from both the MemTable and SSTable. 
+
+
+Reading from SSTable is more involved 
+
+Partitiion Summary - sits on top of Partition Index and lives in RAM 
+
+Partition Index :
+
+Key Cache - In memory data structure that maps the parition key to the actual byte offset in the SSTable where the data lives. It is a typical caching mechanism. 
+
+Bloom Filter - is a in memory filter . In Bloom filter Yes means MAYBE , but a NO means DEFINITELY  Not present. 
+
+Compaction :Merging of SSTables to free up resources , space and memory . 

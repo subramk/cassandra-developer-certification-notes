@@ -1,0 +1,158 @@
+
+C* Storing Data 
+==================
+
+CommitLog  - on Disk (sequential)
+Memtable   - in RAM (sorted by clustering column if any )
+SSTable    - on Disk ( sorted )
+
+C M S 
+======
+
+Commit Log  - sequential and in HDD storage ( data survives here even if a Node Crashes )
+Memtable - Sorted but on RAM ( since it is RAM , data in memtable is lost when the node crashes.)
+
+Once a write request comes in , it is written to commit log and the memTable. Once Commit log and memtable are written to , C* says it is a successful write and returns this response to the Client. CL hence will have the latest data . 
+
+If a node crashes , then a Memtable can be re-built by replaying the commit log. At some point , data is Flushed  from Memtable to SSTable . A single Table can have its data stored in multiple MemTables.  
+
+SSTable (Sorted String Table ) is the place where the data is stored.
+
+SSTable comprises of 
+
+	- Index File : 	( lives on the HDD )
+				   - One per SS TAble. 
+				   -Holds location where the the actual Row  is located/stored. It is a 
+	                index into the data file . The Index File hence will have the partition key pointing to  where EXACTLY the data is stored in the data file.   
+
+
+	-Partition  Summary File :  lives in Memory )
+					- Summary of the Index File .
+	
+
+	- Data File :  On HDD 
+				 	- is where the actual Data is Stored. 
+				 	- All columns are stored in the datafile in SORTED Order.
+
+
+	- Bloom Filter : Live in Memory 
+					 Quickly looking up a key to check if it is present or not 
+	 				 YES means may be , NO means definetly NOT 
+
+
+Row Cache 
+
+	- ALL , NONE , N - how many rows must be cached. RowCache lives in RAM ( Memory ) .RowCache is a read through cache, meaning , if a row is not found in the cache on the first hit , the cache will get updated so that on 2nd request the row can be served from cache itself. 
+
+
+Key Cache 
+	
+	- Present in RAM (Memory)
+
+	- Key value pair 
+		- Key is the primary key of the table 
+		- value is the location of the 'Offset' in the SSTable where the row is located. 
+
+OVERALL PICTURE OF STORAGE COMPONENTS IN  RAM AND HDD 
+
+
+	KEY CACHE - RAM 
+	ROW CACHE - RAM 
+	INDEX SUMMARY   - RAM 
+	BLOOM FILTER 	  - RAM 
+	MEMTABLES - RAM 
+
+	COMMIT LOG - DISK 
+	INDEX TABLE- DISK 
+	DATA TABLE - DISK 
+	SS TABLE   - DISK 
+	COLUMN BLOOM FILTERS - ???
+
+
+WRITE PATH OF A C* REQUEST 
+
+		- First update on a Write Request , is commit log ( with timestamp , if not avalable C* provides it )
+		- Second Memtable is updated 
+		- Then the data in the RowCache is deleted ( if there was previous data about the same Row). 
+		- The next time the row is READ , the cache (ie Rowcache)  will get updated. 
+
+		- C* does not delete direclty . it marks it as a tombstone.
+		- gc_grace_seconds is the property that specifies time to live [TTL] for the tombstone . default is 10 days.
+		- This is specified at the time of table creation && Configurable.
+		- Why Tombstone . Why not delete immidately - the gc_grace_seconds gives replica node/s an opportunity to ensure the DELETE is propagaged - JUST in case the NODE was down at the time when actual DELETE occurred. 
+		
+		- Periodically , MemTable is FLUSHED to SSTable	, this can happen 
+			- when MemTables are full 
+			- when commitLogs are Full 
+			- or when an explicit Flush is triggerred. 
+
+		- Data is sorted in MemTable and hence when it is written to a new SSTable , the order is maintaned. 
+		- Once data is written to SSTable , the commit Log is PURGED. 
+
+		- how many SS Tables allowed per node is controlled thru the property min_threshold_property &&  is configurable. 
+		- COMPACTION in SSTables - means mutiples SSTables are merged to a SINGLE SS Table when above property threshold has exceeded.
+		- Compaction REMOVES tomstones and deleted associated rows / columns etc. 
+		- ALSO the OLD SS Tables (ie pre compaction) are deleted. 
+
+
+
+READ PATH 
+	When a read request comes into a NODE  this is what happens 
+
+		(1)- C* checks in Row cache first , and if found ,return it (RC must be enabled for this)
+		(2)- if RowCache (in RAM) not successful (or disabled) , check bloomfilters to see if the row exits 
+			(3)BloomFilters now checks if the KeyCache has this key , 
+			    if yes , then use this Key to do a QUICK look up of OFFSET of the row in  the SSTable to retrieve the row . Sometimes the KeyCache might return
+			    multiple keys - in such a case that many SSTables will be queried 
+
+			- If the KeyCahce is not enabled or returns nothing, then read the Index Summary (present in the RAM) and get the offset of the partition key in the 
+			Index Table . Scan through the index table frm the offset sequentially 
+			and get the location of the data in the Data Table. 
+
+			- Now since we have the data from the DataTable, we then update the 
+			KeyCache(in RAM) with the latest data from 
+		
+			- Now , READ the MEMTables which COULD potentially have the latest data.
+			( memtables COULD  have received the latest data for that parition key and may not have flushed it yet to the SSTable). 
+			
+			- Merge Cells from SSTAble and Memtable by Timestamp . We are hence able to pick up the value with the latest timestamp. Note that 
+			  a column value may be latest either in the MemTable or in the SSTable . When a read request happens , what is returned back to the client is a MERGE ( ie taking the lastest from each of these and returning it a SINGLE Response )
+			
+			-Now Update the ROW Cache as well before returning the DATA to the client.
+
+	When we get a Read Request where CL=3 , then the co-ordinator node sends a DIRECT Read request to one replica and DIGEST requests to the other two replicas. If they agree the result is sent back to the client . If they do not , the most recent timestamped result is considered current and sent to the client. The coordinator node MAY need to request the latest timstamped version from a REPLICA . 
+	
+
+
+Gossip Protocol - GP 
+
+	- InterNode communication of state information about themselves
+	- ... and other nodes as well
+	- Hence all nodes know about each other' state 
+	- GP runs in the background seamlessly 
+
+
+Hinted Handoff - is triggered by Gossip protocol 
+	- When a node notices whether the node for which it has a hint file has recovered or not using gossip 
+
+	- If the target node has recovered the coordinator node relays the writes from each of the hint file to the node so that it is upto date . 
+
+		 
+
+INDEX :  Index with MULTIPLE COLUMNS ARE NOT ALLOWED IN C* 
+
+Data for a ROW can be spread ACROSS the MEMTABLE and multiple SSTABLES . The ROW returned is made up of the most recent (timestamp) value for each column. 
+
+CommitLog  will have the LATEST value for any Row as it receives any updates FIRST. Also Commit log in in on Disk and survies NODE crashed. 
+
+
+
+
+
+
+
+	
+
+
+	 
+

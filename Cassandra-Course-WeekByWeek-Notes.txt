@@ -1,0 +1,258 @@
+
+
+Additioanl Resources for C* 
+
+DS-101 onwards Courses in C* - 
+https://academy.datastax.com/resources/ds220
+
+Katacoda for C* - https://katacoda.com/datastax/courses/cassandra-intro
+
+
+Cassandra 
+
+Week - 1 
+
+- astra - SAAS cloud offereing of Cassandra 
+- protocol of Cassandra is - gossipping , all nodes are sync'ed - 
+  hence , no master slave relationship here . 
+-   it is a 'masterless' system. - hence it has no master and no slave . 
+- every node has the same responsibility as the other 
+- every node is resilent and failure of a node is never a issue
+- multiple nodes in cassandra 
+- Group of of nodes is a datacentre aka RING 
+- cassandra scales in linear fashion 
+- More nodes , means more power in the cluster 
+- cassandra uses horizontal scaling - means , add more nodes ... in short  multiple less expenive   commodity hardware. when nodes are added , the data gets moved automatically by Cassandra to it 
+no need of any script to do the  copying etc.
+- individual nodes expected to be same hardware configuration so as to be equally powerful with other others
+
+Concepts in Cassandra 
+====================
+
+- Keyspace - top level container of the tables . Very similar to schema in a RDBMS when creating keyspace the RF needs to be specified and the Replication  strategy needs to be mentioned as well. 
+
+- RF Video : https://www.youtube.com/watch?v=u7nHyzFHqMA
+
+- Partition key : the key is a column in the table and there can be duplicate keys . however every row with the same partition key will be stored together in a cluster
+
+- Partition key is mandatory in C*  and it is part of the PrimaryKey . 
+- PrimaryKey guarantees uniqueness , while the PartitionKey when hashed gives us a value which determines which exact NODE in the RING the data will get stored. 
+
+
+  Ex : country city population table 
+
+  FR    Paris  223,12,131421
+  FR    Lyon   224,12,131421
+  UK	LONDON 1234,1341,14134
+  UK	MANCHESTER 5234,1341,14134
+  UK	GLASGOW 4234,1341,14134
+
+  here FR (2 rows ) and   UK ( 3rows ) , will be in each separate node . Say here the partition key is the countryCode ( ex FR ) . 
+
+  value of the PartitioonKey is hashed and this hash value is taken , and stored in the node 
+
+  Replication :
+  	- duplicate data across data centres (AKA Rings)
+  	- coordinator node - 	initial node that receives the query request  (can be any node).This could be any node 
+  	- replica node - actual node where the data is store. 
+
+Consistency level - the level that we want to enforce in Cassandra abt the nodes to ack to the coordinator that the data has been persisted  
+  	- ALL ( all nodes ack to the coordinator)
+  	- ONE ( return when the First  node ack to the coordinator)
+  	- Quorum ( majority of the nodes .. when RF is 3 , quorum is 3/2 = 1.5 and hence it is 2 . ) 
+    - 
+
+  Immediate consistency : 
+
+  Important When CL of read + CL of write > RF , then we acheive immediate consistencyor Strong consistency. 
+  
+  For Immediate Consistency Always go for : Write at Quorum /  Read  at Quorum 
+
+  Weaker consistency : slightly slower but it is same as  Eventually Consistency - as long 
+  as it is ok with a slight drag in the data . 
+  Write CL = ONE , Read CL = One 
+
+  Strong Consistency : Write at Quorum , READ at ALL 
+
+ C* V Nodes 
+ ================
+
+  - In C* we can add nodes to a Ring , so that the new node can share the burden of the existing nodes . 
+  - Once a new node is added , tes can stream data into it , so that the new node
+   can bootstrap quickly and start sehe other nodrving requests. This rebalancing of data from old to new node happens seamless in C* because of the VNode feature . 
+  - The burden of this data distribution is not assigned to a single Node , but all nodes in the ring participate in this
+  - Adding /Removing data with VNode hence keeps the cluster balanced and VNodes automate token range assignment. 
+  
+  C* Gossip protocol 
+  ==================
+  - Nodes shares information medtadata amongst themselves, thereby entire cluster knows this 
+    informationa and is not restricted to one one. 
+  
+  - Nodes can gossip with as many nodes (usually 1 to 3 nodes). Nodes do not keep track of their gossip history. 
+  
+  - This helps in fault tolerancy 
+
+  - Gossip traffic is a quiet hum happenning in the background and does not cause network traffic blockages.
+  
+  - Nodes spread only metadata represented by its endpoint state 
+
+        Endpoint State
+          - heartbeat state 
+              :generation
+              :version
+          - application state 
+              :status = normal /bootstrap/leaving/left/remove/
+              :DC 
+              :Rack=
+              :Load
+              :Schema 
+              .......
+  C* snitches
+  ================
+  - Refers to Rackspace and DC metadata about the node. 
+  - topology of the cluster is thus stored in the snitch 
+  - cassandra.yaml stores this information. 
+  - snitches are either Regular or CloudBased.  
+
+
+C* Consistency 
+================
+
+CAP Theroem - Consistency , 
+              Availablity ,
+              Partition Tolerance
+
+C* is AP based out of the box : optimised for High Availability and Partition toleranant 
+C* does not optimise for Consistency but gives Flexibility ie tunable consistency 
+
+Important : 
+How do we tune consistency ... in C* we achieve this with the combination OF Replication Factor(RF) RF  and Consitency Levels (CF)
+
+RF : How many replicas of the node are present that store the data . RECOMMENED IS RF 3 
+
+Consistency level : (CL ) : Tells us how much Acknowledgments  we need from the Replicas before we say we are done
+(ie for both Read and Write ) CF can be ONE,QUORUM,LOCAL QUORUM, ALL - Recommended IS QUORUM.
+
+USING CL of 1 is fastest and CL of ALL is slowest while CL=Quorum is a good balance to have.
+CL ALL forces consistency as we go full blast into consistency.
+
+We get Strong Consistency when we have a WRITE CL = ALL and a READ CL = ONE
+
+Better Still we can get Strong consistency with a WRITE CL = Quorum and a READ CL = Quorum.
+
+ 
+C* Write path 
+================
+
+  When C* writes data it writes it to 2 place , 
+  - Commit Log - Disk 
+  - MemTable - which sits in the  RAM 
+  
+  ACK happens only when it is written to BOTH MEMTABLE and commit log. 
+
+  SSTable - When MEMTable gets full because RAM is finite, it flushes to a immutable SSTable.
+  Compaction - Smaller SS Tables gets combined into a larger SSTable. 
+
+C* Read Path 
+================
+
+Partition Index 
+Partition Summary 
+Key Cache (RAM LEVEL )
+Bloom Filter (RAM LEVEL )
+
+Cassandra Structure (C* - Cassandra ) 
+  - Keyspaces contains tables . Keyspace is like a tables have rows and columns
+  - group of related rows called partitions are stored together on the same node (or nodes)
+  - each row has a PARTITION KEY 
+  - CLUSTERING columns are used for ordering the data . these follow the partition key when 
+    the table is created ) . 
+  - Primary key definition is also present in C* when   
+  - So in essence , a TABLE can hold MANY partitions (Bunched by the partition key)
+  - when rows are grouped by their partition key , then these grpous can be stored in different nodes.
+  - so all DATA in a Table , is split by their partition key and gets stored across different nodes
+
+use keyspace <<yourkeyspacename>> ; 
+
+CREATE TABLE IF NOT EXISTS user_credentials (
+    email     text,
+    password  text,
+    userid    uuid,
+    PRIMARY KEY (email)
+);
+
+UUID - can be generated using uuid() 
+TIMEUUID - can be generated using now()
+
+C* Partitions & Replication Factor : https://www.youtube.com/watch?v=u7nHyzFHqMA
+
+
+Note : Cassandra - does not perform joins as there is no concept  of a Foreign Key 
+
+The bottom line: If you want your Cassandra queries to be fast:
+
+a) Create tables where the full partition key is how you will query the table
+b) The clustering columns are how you want to order the results
+c) Do not require more than one partition key per query
+
+A table in Apache Cassandra™ shares many similarities with a table in a relational database. It has named columns with data types and rows with values. A primary key uniquely identifies a row in a table.
+
+There are also important differences. In Cassandra, on one hand, a table is a set of rows containing values and, on the other hand, a table is also a set of partitions containing rows. Specifically, each row belongs to exactly one partition and each partition contains one or more rows. 
+
+A primary key consists of a mandatory partition key and optional clustering key, where a partition key uniquely identifies a partition in a table and a clustering key uniquely identifies a row in a partition.
+
+A table with single-row partitions is a table where there is exactly one row per partition. A table with single-row partitions defines a primary key to be equivalent to a partition key.
+
+A table with multi-row partitions is a table where there can be one or more rows per partition. A table with multi-row partitions defines a primary key to be a combination of both partition and clustering keys. Rows in the same partition have the same partition key values and are ordered based on their clustering key values using the default ascending  order.
+
+In Cassandra , WE ALWAYS create a Table for every query we perform. 
+
+The query WILL use the partition key as it is the fastest way for C* to retrieve data.
+(SINCE all data for that partition key is most likely to be in the SAME NODE )
+
+
+Data modelling in C* 
+=====================
+Understand your application workflow 
+What type of queries does your App need 
+Build tables around your queries ( very important )
+
+Comparision between RDBMS and C* 
+
+     RDBMS                              C*
+
+Data-Model-Application            Application-Model-Data
+Entities are King                 Queries are King 
+Primary key for uniqueness        Primary keys are much More ( ie Partition key + [optional] Clustering columns )
+single point of failure           Distributed architecture across clusters
+ACID                              ACID not present - CAP Theorem
+Joins and Indexes                 Denormalized
+Referential Integrity             RI not enforced
+
+C* is a AP System - Availality and Partition tolerance ( A & P of CAP) . 
+However , for Consistency 
+to be a factor , we could make it more CP than AP  - this is called tunable consistency 
+
+C* does not have JOINs as there is no referential integrity . 
+
+Consistency : All clients see the same data at the same time 
+Availability : System continues to operate even in the prsence of node failures
+Partition Tolerance : The system continues to operate in spite of network failures. 
+
+
+User defined types (UDT's) in Cassandra - useful to aggregate columns into a data type to make it more 
+meaningful . 
+
+Counter - data type that is imprecise in nature but very useful for increment /decrement operation only .  but it is a automatic increment/decrement . VALUE CANNOT BE SET . If we have a COUNTER column in a table, then an INSERT statement of that table will fail , we can only use UPDATE 
+
+What are 'Lightweight transactions' (LWT) - READ (and validate condition) before - The term LINERIZBLE CONSISTENCY is got through LWT 
+
+
+Distributed architectures are no more ACID , but BASE 
+
+BASE  - Basic availability , Soft Sate , Eventual consistency...
+
+
+
+
+

@@ -1,0 +1,12 @@
+
+
+Datastax Astra Hackaton projects - 
+
+
+1st : Infinity 			: 	https://github.com/mgubaidullin/infinity 
+2nd : Asset Management 	:   https://github.com/public-repo-ayan/astrakathon-2020-asset-management
+
+
+Spring PetClinic with Reactive + Cassandra 
+
+https://www.youtube.com/watch?v=_FlZXkMwDak

@@ -1,0 +1,173 @@
+https://academy.datastax.com/#/online-courses/ca2e1209-510b-44a6-97de-d5219d835319
+
+DS-220-DataModelling in C*
+
+COPY command - helps to import/export CSV  ( ie bulk upload )
+
+TRUNCATE : clears the data from the table and the SSTable . does NOT  delete the TABLE only clears the rows. 
+
+ALTER : alter table columns but not the columns in the Primary key 
+
+SOURCE : this command helps you to load a file from terminal 
+
+DROP TABLE : DROPS THE TABLE 
+
+Partition Keys determine a Grouping Criteria while Clustering Columns determine Ordering Criteria.
+
+Tables and their Features ::
+
+
+Collection DataTypes
+	 - SET ( no duplicates)
+	 - LIST ( allows duplicates)
+	 - MAP (key value pair )
+
+Nested datatypes only possible via Frozen Keyword 
+
+User definted Datatypes - ( UDT's ) 
+	- groups related information . UDT's can attach multiple data fields, each named and typed to a single column.
+	- can be any datatype including collections and other UDT's.
+
+FROZEN : In Cassandra if you define UDT or Collection as frozen, you can't update UDT's or collection's individual item, you have to reinsert with full value
+
+
+Counter columns 
+UserDefined Functions ( UDF )
+User Defined Aggregates ( UDA )
+
+
+Write Techniques : 
+
+In C* attributes for a table , the data of it CAN be STORED  across many nodes. 
+
+Thus the data needs to be same/consistent. the application may use different tables 
+to read the same information. As such , it becomes important that the data remains the same for consistent behaviour. 
+
+All copies of the same data in your schema should have the same values. 
+
+- Adding,updating or deleting data may require multiple INSERTS , UPDATES or DELETES 
+
+- LOGGED Batches is a built in way in DSE to ensure that multiple insert,update,delete operations all happen in a consistent manner. (CONSISTENCY is achieved using batches)
+
+// insert 
+BEGIN BATCH 
+	insert into VIDEOS (video_id,....) VALUES (1,...);
+	insert into videos_by_title(title,video_id,...) values ('Jaw',1,...); 
+
+APPLY BATCH 
+
+// update 
+BEGIN BATCH 
+	UPDATE videos  SET title='Jaws' where video_id = 1; 
+	insert into videos_by_title(title,video_id,...) values ('Jaws',1,...); 
+	DELETE from videos_by_title where title='Jaw' and video_id=1;
+
+APPLY BATCH 
+
+Process : The co-ordinator nodes receives the request for the BATCH job and saves it in a Batch log before it can action it. 
+
+BATCH gets as as close as we can to ACID . However we cannot get batch isolation - meaning that there could be still a possibility of both old data and new data co-existing in a certain time window. 
+
+Batches are not intended for BULK Loading . They can overload  the coordinator node and cause performance bottlenecks . No ordering of operations in batches - all writes are executed with the same timestamp 
+
+Lightweight Transactions (LWT): DOES a READ to check the condition , and then performs a INSERT /UPDATE or DELETE operation . Essentialy this is ACID transaction at partition level. ( UPSERT)
+
+Lightweight transcations achieved using 'IF NOT EXISTS' KEYWORD. 
+
+(note user_id is primary key of the table )
+Ex : INSERT INTO USERS   (user_id,fn,ln....) VALUES ('pmcmcfadin','pmc','mcfadin') IF NOT EXISTS; 
+
+So this means there will be no insert if the pmcmcfadin user_id DOES  Exists. ( ie existing row will not be overwritten.)
+
+
+READ Techniques : (like secondary index)
+	- useful &&  handy when requirements changes and data model NEED not be changed or tweaked.  
+
+Index on columns : Aka Secondary Indexes 
+	
+	- Secondary index - Index on a column that allows a table to be queried on a column that is USUALLY  prohibited. 
+	- Manually defined by the user . 
+	- INDEX CAN BE CREATED ONLY A SINGLE COLUMN. WE CANNOT HAVE MULTI-COLUMN INDEX.
+	- CANNOT  be created for Counter columns or static columns 
+	- Secondary Indexs created additional data structures on nodes holding table partitions. 
+
+	-  QUERY ON indexed column requires accessing all local indexes of all nodes (EXPENSIVE)
+	- Query on partition key and indexed columns requires accessing local index on nodes - Efficient. 
+
+
+	USE Secondary Indexes 
+		 - low cardinality columns. 
+		 - When prototyping smaller datasets
+		 - (IMP) For search on both partitionKey and an indexed column in a large partition
+
+	DO NOT USE 
+		- ON HIGH cardinality columns. 
+		- With Tables that use a COUNTER column 
+		- Frequently updated or deleted coliumns. 
+
+
+	COUNTER COLUMNS : WHEN COUNTER COLUMN is used in a table all the other columns should be only partition key or clustering column. 
+
+
+	Materlized Views  (MV) : Another type of index suited for HIGH Cardinality Columns. 
+		
+		- a database object that stores query results.
+		- A SEPARATE  table that is built from another table's source 
+		- has a NEW primary key and new properties. 
+		- Suited for HIGH CARDINALITY columns. 
+		- THE COLUMN of the Source table's primary key must be part of the MV's Primary key
+		- When creating the MV , please note that only ONE NEW Column can be added to the PRIMARY key of the source table.  
+		- You cannot write to a MV 
+		- STATIC Columns are not allowed. 
+		- MV's are asyncrhonously updated after DATA is INSERTED INTO the source table. MV updates are delayed 
+		- C* performs a read repair on MV , only after updating the source table. 
+
+
+ Say ,we have a users table like this 
+ 	 	
+ 	 	user_id ( primary key )
+ 	 	email 
+ 	 	fn
+ 	 	ln
+ 	 	registration_date 
+
+Normally , we CAN query this table ONLY  using the user_id  . Creating a MV allows us to query the table by other columns. 
+
+Create MATERIALIZED VIEW user_by_email 
+AS 
+SELECT  fn,ln,email
+FROM USERS
+WHERE email IS NOT NULL and user_id is NOT NULL 
+PRIMARY KEY(email,user_id) ; 
+
+Now MV can be used as if it were a table . 
+
+Note : user_id must be part of the primary key for this MV as the USERS table 's primary key is the user_id) , and this should be present. NOTE: NOT NULL check for both user_id and email IS REQUIRED. 
+
+select fn,ln,email from user_by_email where email='someemail.com' //note we are quering by email , which was NOT EARLIER POSSIBLE. 
+
+EXPLANATION:  THE primary key of the original users table DID NOT have email as a primary key.  The MV has this as a Primary key and hence we can query the MV . Clearly shows how the user table now can be queried using the email - by using MV - when earlier we could query only by  user_id ...
+
+
+DSE - AGGREGATE FUNCTIONS AVAILABE ARE 
+
+SUM, 
+AVG, 
+COUNT, 
+MIN,
+MAX 
+
+
+
+ALLOW FILTERING  - IN C* WE need to use all the columns in the PK as part of the query. If Not , The query will fail . If we still want to query to pass , we will need to use `ALLOW FILTERING` AT the end of the query . 
+
+
+
+
+
+
+
+
+
+
+
